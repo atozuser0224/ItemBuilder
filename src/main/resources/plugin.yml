@@ -1,0 +1,4 @@
+name: itemBuilder
+version: '${version}'
+main: org.gang.mine.itembuilder.ItemBuilder
+api-version: '1.20'
