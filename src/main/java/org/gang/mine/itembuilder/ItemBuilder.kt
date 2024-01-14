@@ -14,13 +14,12 @@ import org.bukkit.persistence.PersistentDataType
 import java.util.*
 
 open class ItemBuilder{
-    private var item: ItemStack
-    private var itemMeta: ItemMeta
-    private var persistence:PersistentDataContainer
+    var item: ItemStack
+    var itemMeta: ItemMeta
+    var persistence:PersistentDataContainer
     var material:Material
     var amount: Int
     var lore = mutableListOf<String>()
-
     constructor(
         name:String,  material: Material = Material.AIR,  amount: Int = 1
     ){
@@ -40,7 +39,7 @@ open class ItemBuilder{
         setName(this.item.itemMeta.displayName)
     }
 
-    fun getItem(): ItemStack {
+    fun getItemStack(): ItemStack {
         itemMeta.lore = lore
         item.setItemMeta(itemMeta)
         item.amount = amount
@@ -65,13 +64,21 @@ open class ItemBuilder{
                      value : Double,
                      slot: EquipmentSlot,
                      operation:AttributeModifier.Operation=AttributeModifier.Operation.ADD_NUMBER): ItemBuilder {
-        val attribute = AttributeModifier(UUID.randomUUID(),key,value,operation,slot)
+        val sharp = itemMeta.enchants[Enchantment.DAMAGE_ALL]?:0
+        val attribute = AttributeModifier(UUID.randomUUID(),key,value + sharp * 0.8,operation,slot)
         itemMeta.addAttributeModifier(attributeKey,attribute)
         return this;
     }
+
     fun removeAttribute(attribute: Attribute): ItemBuilder {
         itemMeta.removeAttributeModifier(attribute)
         return this
+    }
+    fun resetAttribute(): ItemBuilder {
+        Attribute.values().forEach {
+            itemMeta.removeAttributeModifier(it)
+        }
+        return  this
     }
 
     fun <T> setData(key: String, type: PersistentDataType<T, T>, value: T&Any): ItemBuilder {
@@ -117,8 +124,21 @@ open class ItemBuilder{
         itemMeta.removeEnchant(enchantment)
         return this
     }
-    class Data<T>(private val itemBuilder: ItemBuilder, val value: Any?){
-
+    fun resetEnchant(): ItemBuilder {
+        itemMeta.enchants.forEach{
+            itemMeta.removeEnchant(it.key)
+        }
+        return this
+    }
+    fun let(scope: ItemBuilder.() -> Unit): ItemBuilder {
+        this.scope()
+        return this
+    }
+    class Data<T>(private val itemBuilder: ItemBuilder, private val value: Any?){
+        fun let(scope: ItemBuilder.(T?) -> Unit): ItemBuilder {
+            itemBuilder.scope(value as T)
+            return itemBuilder
+        }
         fun addEnchant(enchantment: Enchantment): ItemBuilder {
             require(this.value is Int) { "Value must be of type Int" }
             itemBuilder.addEnchant(enchantment, value)
@@ -128,14 +148,12 @@ open class ItemBuilder{
                          key : String,
                          slot: EquipmentSlot,
                          operation:AttributeModifier.Operation=AttributeModifier.Operation.ADD_NUMBER): ItemBuilder {
-            require(value is Double)
-            val attribute = AttributeModifier(UUID.randomUUID(),key,value,operation,slot)
+            require(value is Number)
+            val attribute = AttributeModifier(UUID.randomUUID(),key,value.toDouble(),operation,slot)
             itemBuilder.itemMeta.addAttributeModifier(attributeKey,attribute)
             return itemBuilder;
         }
-        fun <T> to(): Data<T> {
-            return Data<T>(this.itemBuilder,this.value)
-        }
+
     }
 }
 
@@ -146,4 +164,5 @@ fun <T> ItemStack.getDataOrDefault(key: String, type: PersistentDataType<T, T>,d
         this.itemMeta.persistentDataContainer.getOrDefault(NamespacedKey.fromString(key)!!,type,default)
     }
 }
+
 fun ItemStack.builder()= ItemBuilder(this)
